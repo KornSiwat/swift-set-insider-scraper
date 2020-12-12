@@ -1,5 +1,4 @@
-import { stockSymbols } from "./stockSymbols"
-import { getConnection } from "typeorm"
+import { EntityTarget, getConnection, Repository } from "typeorm"
 import { Stock } from "./models/Stock"
 import { SETFacade } from "./facades/SETFacade"
 import { Price } from "./models/Price"
@@ -10,13 +9,15 @@ import { News } from "./models/News"
 type Symbol = string
 
 class SETInsiderScraperApplication {
-  private requestPerTimeLimit: number
+  private maxOnGoingScrapeCount: number
   private setFacade: SETFacade
   private onGoingScrape: Promise<void>[]
+  private stockSymbols: string[]
 
-  constructor(requestPerTimeLimit: number) {
-    this.requestPerTimeLimit = requestPerTimeLimit
+  constructor(stockSymbols: string[], maxOnGoingScrapeCount: number) {
     this.setFacade = new SETFacade()
+    this.maxOnGoingScrapeCount = maxOnGoingScrapeCount
+    this.stockSymbols = stockSymbols
     this.onGoingScrape = []
     this.scrapeAllStockPrices = this.scrapeAllStockPrices.bind(this)
     this.scrapeAllStockOfficialNews = this.scrapeAllStockOfficialNews.bind(this)
@@ -24,19 +25,46 @@ class SETInsiderScraperApplication {
   }
 
   public async scrapeAllStockNews(req: Request, res: Response) {
-    stockSymbols.forEach((symbol) => {
-      this.scrapeStockNews(symbol)
-        .then(() => console.log(`News Complete: ${symbol}`))
-        .catch((error) => console.log(`News Fail: ${symbol} due to ${error}`))
-    })
+    this.scrapeAllStock(this.scrapeStockNews, "News")
 
-    res.sendStatus(200)
+    res.status(200).send("started all stock news scrape")
   }
 
-  public async scrapeStockNews(symbol: Symbol) {
-    const stock = await this.getStockBySymbol(symbol)
+  public async scrapeAllStockOfficialNews(req: Request, res: Response) {
+    this.scrapeAllStock(this.scrapeStockOfficialNews, "Official News")
+
+    res.status(200).send("started all stock official news scrape")
+  }
+
+  public async scrapeAllStockPrices(req: Request, res: Response) {
+    this.scrapeAllStock(this.scrapeStockPrices, "Price")
+
+    res.status(200).send("started all stock prices scrape")
+  }
+
+  private async scrapeAllStock(
+    scrapeFunction: (stock: Stock) => Promise<void>,
+    scrapeDataName: string
+  ) {
+    this.stockSymbols.forEach(async (symbol) => {
+      const stock: Stock = await this.getStockBySymbol(symbol)
+
+      this.waitForScapeQueueToBeAvailable()
+
+      const scrape = scrapeFunction
+        .call(this, stock)
+        .then(() => console.log(`${scrapeDataName} for ${symbol} Completed`))
+        .catch((error) =>
+          console.log(`${scrapeDataName} for ${symbol} Error: ${error}`)
+        )
+
+      this.addOnGoingScrape(scrape)
+    })
+  }
+
+  private async scrapeStockNews(stock: Stock) {
     const newsDataList = await this.setFacade.getNewsDataListByStockSymbol(
-      symbol
+      stock.symbol
     )
 
     newsDataList.forEach(async (newsData) => {
@@ -44,74 +72,44 @@ class SETInsiderScraperApplication {
       const link = newsData.link
       const date = new Date()
 
-      if (!(await this.isNewsWithLinkAndStockExist(link, stock))) {
-        this.onGoingScrape.push(
-          this.syncNews(new News(stock, date, name, link))
-        )
-      }
+      const isStockNewsDataNotAlreadyExist = !(await this.isNewsWithGivenLinkAndStockExist(
+        link,
+        stock
+      ))
 
-      if (this.onGoingScrape.length >= this.requestPerTimeLimit) {
-        await Promise.all(this.onGoingScrape)
-
-        this.onGoingScrape = []
+      if (isStockNewsDataNotAlreadyExist) {
+        await this.syncNews(new News(stock, date, name, link))
       }
     })
   }
 
-  public async scrapeAllStockOfficialNews(req: Request, res: Response) {
-    stockSymbols.forEach((symbol) => {
-      this.scrapeStockOfficialNews(symbol)
-        .then(() => console.log(`OffificalNews Complete: ${symbol}`))
-        .catch((error) =>
-          console.log(`OfficialNews Fail: ${symbol} due to ${error}`)
-        )
-    })
-
-    res.sendStatus(200)
-  }
-
-  public async scrapeStockOfficialNews(symbol: Symbol) {
-    const stock = await this.getStockBySymbol(symbol)
+  private async scrapeStockOfficialNews(stock: Stock) {
     const officialNewsDataList = await this.setFacade.getOfficalNewsDataListByStockSymbol(
-      symbol
+      stock.symbol
     )
-
     officialNewsDataList.forEach(async (officialNews) => {
       const date = officialNews.date.trim()
       const source = officialNews.source
       const name = officialNews.name
       const link = officialNews.link
 
-      if (!(await this.isOfficialNewsWithLinkAndStockExist(link, stock))) {
-        this.onGoingScrape.push(
-          this.syncOfficialNews(
-            new OfficialNews(stock, date, source, name, link)
-          )
+      const isOfficalNewsDataNotAlreadyExist = !(await this.isOfficialNewsWithGivenNameAndLinkAndStockExist(
+        name,
+        link,
+        stock
+      ))
+
+      if (isOfficalNewsDataNotAlreadyExist) {
+        await this.syncOfficialNews(
+          new OfficialNews(stock, date, source, name, link)
         )
       }
-
-      if (this.onGoingScrape.length >= this.requestPerTimeLimit) {
-        await Promise.all(this.onGoingScrape)
-
-        this.onGoingScrape = []
-      }
     })
   }
 
-  public async scrapeAllStockPrices(req: Request, res: Response) {
-    stockSymbols.forEach((symbol) => {
-      this.scrapeStockPrices(symbol)
-        .then(() => console.log(`Price Complete: ${symbol}`))
-        .catch((error) => console.log(`Price Fail: ${symbol} due to ${error}`))
-    })
-
-    res.sendStatus(200)
-  }
-
-  public async scrapeStockPrices(symbol: Symbol) {
-    const stock = await this.getStockBySymbol(symbol)
+  private async scrapeStockPrices(stock: Stock) {
     const priceDataList = await this.setFacade.getStockPriceDataListByStockSymbol(
-      symbol
+      stock.symbol
     )
 
     priceDataList.forEach(async (priceData) => {
@@ -125,121 +123,138 @@ class SETInsiderScraperApplication {
       const totalVolume = parseFloat(priceData.totalVolume)
       const totalValue = parseFloat(priceData.totalValue)
 
-      if (!(await this.isPriceWithDateAndStockExist(date, stock))) {
-        this.onGoingScrape.push(
-          this.syncPrice(
-            new Price(
-              stock,
-              date,
-              openPrice,
-              closePrice,
-              highestPrice,
-              lowestPrice,
-              changeInValue,
-              changeInPercentage,
-              totalVolume,
-              totalValue
-            )
+      const isPriceDataNotAlreadyExist = !(await this.isPriceWithDateAndStockExist(
+        date,
+        stock
+      ))
+
+      if (isPriceDataNotAlreadyExist) {
+        await this.syncPrice(
+          new Price(
+            stock,
+            date,
+            openPrice,
+            closePrice,
+            highestPrice,
+            lowestPrice,
+            changeInValue,
+            changeInPercentage,
+            totalVolume,
+            totalValue
           )
         )
-      }
-
-      if (this.onGoingScrape.length >= this.requestPerTimeLimit) {
-        await Promise.all(this.onGoingScrape)
-
-        this.onGoingScrape = []
       }
     })
   }
 
-  private async getStockBySymbol(symbol: Symbol): Promise<Stock> {
-    const connection = getConnection()
-    const stockRepository = connection.getRepository(Stock)
+  private async addOnGoingScrape(scrape: Promise<void>) {
+    this.onGoingScrape.push(scrape)
+    this.checkOnGoingScrapeLimit()
+  }
 
-    const result: Stock | undefined = await stockRepository.findOne({
-      where: { symbol: symbol },
-    })
+  private async checkOnGoingScrapeLimit() {
+    const isOnGoingScrapeExceedLimit =
+      this.onGoingScrape.length >= this.maxOnGoingScrapeCount
 
-    if (!result) {
-      const newStock = new Stock(symbol)
-      stockRepository.save(newStock)
-
-      return newStock
+    if (isOnGoingScrapeExceedLimit) {
+      this.waitForAllPromiseToResolve()
+      this.clearOnGoingScrapeList()
     }
+  }
 
-    const stock = result
+  private waitForScapeQueueToBeAvailable() {
+    do {} while (this.onGoingScrape.length > this.maxOnGoingScrapeCount)
+  }
 
-    return stock
+  private async waitForAllPromiseToResolve() {
+    await Promise.all(this.onGoingScrape)
+  }
+
+  private clearOnGoingScrapeList() {
+    this.onGoingScrape = []
   }
 
   private async isPriceWithDateAndStockExist(
     date: string,
     stock: Stock
   ): Promise<boolean> {
-    const connection = getConnection()
-    const priceRepository = connection.getRepository(Price)
-
-    return (
-      (await priceRepository.findOne({
-        where: { date: date, stock: stock },
-      })) != undefined
+    return await this.isDataWithGivenValueExist(
+      { date: date, stock: stock },
+      Price
     )
   }
 
-  private async isOfficialNewsWithLinkAndStockExist(
+  private async isOfficialNewsWithGivenNameAndLinkAndStockExist(
+    name: string,
     link: string,
     stock: Stock
   ): Promise<boolean> {
-    const connection = getConnection()
-    const officialNewsRepository = connection.getRepository(OfficialNews)
-
-    return (
-      (await officialNewsRepository.findOne({
-        where: { link: link, stock: stock },
-      })) != undefined
-    )
+    return await this.isDataWithGivenValueExist({ name, link, stock }, News)
   }
 
-  private async isNewsWithLinkAndStockExist(
+  private async isNewsWithGivenLinkAndStockExist(
     link: string,
     stock: Stock
   ): Promise<boolean> {
-    const connection = getConnection()
-    const newsRepository = connection.getRepository(News)
+    return await this.isDataWithGivenValueExist({ link, stock }, News)
+  }
 
-    return (
-      (await newsRepository.findOne({
-        where: { link: link, stock: stock },
-      })) != undefined
-    )
+  private async isDataWithGivenValueExist<T>(
+    filter: any,
+    entity: EntityTarget<T>
+  ): Promise<boolean> {
+    const repository = this.getRepositoryForEntity(entity)
+    const existedData = await repository.find({ where: filter })
+    const isDataExist = existedData.length !== 0
+
+    return isDataExist
+  }
+
+  private async getStockBySymbol(symbol: Symbol): Promise<Stock> {
+    const stock: Stock =
+      (await this.getOneData({ symbol: symbol }, Stock)) || new Stock(symbol)
+
+    await this.syncData(stock, Stock)
+
+    return stock
+  }
+
+  private async getOneData<T>(
+    filter: any,
+    entity: EntityTarget<T>
+  ): Promise<T | undefined> {
+    const repository: Repository<T> = this.getRepositoryForEntity(entity)
+
+    return repository.findOne({ where: filter })
   }
 
   private async syncStock(stock: Stock) {
-    const connection = getConnection()
-    const stockRepository = connection.getRepository(Stock)
-
-    stockRepository.save(stock)
+    this.syncData(stock, Stock)
   }
 
   private async syncPrice(price: Price) {
-    const connection = getConnection()
-    const priceRepository = connection.getRepository(Price)
-
-    priceRepository.save(price)
+    this.syncData(price, Price)
   }
 
   private async syncOfficialNews(officialNews: OfficialNews) {
-    const connection = getConnection()
-    const officialNewsRepository = connection.getRepository(OfficialNews)
-
-    officialNewsRepository.save(officialNews)
+    this.syncData(officialNews, OfficialNews)
   }
 
   private async syncNews(news: News) {
-    const connection = getConnection()
-    const newsRepository = connection.getRepository(News)
+    this.syncData(news, News)
+  }
 
-    newsRepository.save(news)
+  private async syncData<T>(data: any, entity: EntityTarget<T>) {
+    const repository = this.getRepositoryForEntity(entity)
+
+    repository.save(data)
+  }
+
+  private getRepositoryForEntity<T>(entity: EntityTarget<T>): Repository<T> {
+    const connection = getConnection()
+    const repository = connection.getRepository(entity)
+
+    return repository
   }
 }
 

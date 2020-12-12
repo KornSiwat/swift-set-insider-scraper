@@ -3,15 +3,17 @@ import "reflect-metadata"
 import { createConnection } from "typeorm"
 import { SETInsiderScraperApplication } from "./SETInsiderScraperApplication"
 import { createRouter } from "./router"
+import { stockSymbols } from "./stockSymbols"
 
 createConnection()
-  .then((connection) => {
+  .then((_) => {
     const app = express()
     const port = 3000
-    const requestPerTimeLimit = 10
+    const onGoingScrapeLimitCount = 5
 
     const setInsiderScraperApplication = new SETInsiderScraperApplication(
-      requestPerTimeLimit
+      stockSymbols,
+      onGoingScrapeLimitCount
     )
     const router = createRouter(setInsiderScraperApplication)
 
@@ -22,4 +24,4 @@ createConnection()
       console.log(`SET Insider Scraper Application is on port ${port}!`)
     )
   })
-  .catch((error) => console.log("fail to connect db due to" + error))
+  .catch((error) => console.log(`fail to connect db due to + ${error}`))

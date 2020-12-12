@@ -21,7 +21,7 @@ class OfficialNews {
   @Column()
   readonly name: string
 
-  @Column({ unique: true })
+  @Column()
   readonly link: string
 
   constructor(
