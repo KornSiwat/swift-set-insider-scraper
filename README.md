@@ -35,6 +35,8 @@ npm run-script build
 ```
 npm start
 ```
+## Post Man
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://app.getpostman.com/run-collection/1f4a69b219636fb49194)
 
 ## API
 
