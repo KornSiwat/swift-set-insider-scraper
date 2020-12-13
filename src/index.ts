@@ -4,6 +4,7 @@ import { createConnection } from "typeorm"
 import { SETInsiderScraperApplication } from "./SETInsiderScraperApplication"
 import { createRouter } from "./router"
 import { stockSymbols } from "./stockSymbols"
+import cors from "cors"
 
 createConnection()
   .then((_) => {
@@ -17,6 +18,7 @@ createConnection()
     )
     const router = createRouter(setInsiderScraperApplication)
 
+    app.use(cors())
     app.use(express.json())
     app.use(router)
 

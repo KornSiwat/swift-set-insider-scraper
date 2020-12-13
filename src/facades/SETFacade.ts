@@ -40,10 +40,10 @@ class SETFacade {
     return priceDataList
   }
 
-  public async getNewsDataListByStockSymbol(
+  public async getSocialMediaNewsDataListByStockSymbol(
     symbol: Symbol
   ): Promise<NewsData[]> {
-    const url = this.getStockNewsPageURL(symbol)
+    const url = this.getStockSocialMediaNewsPageURL(symbol)
     const html = await this.getPageHTMLByURL(url)
     const dom = new JSDOM(html)
     const newsRows = Array.from(
@@ -107,7 +107,7 @@ class SETFacade {
     return `https://www.set.or.th/set/companynews.do?symbol=${symbol}&ssoPageId=8&language=th&country=TH`
   }
 
-  private getStockNewsPageURL(symbol: Symbol): URL {
+  private getStockSocialMediaNewsPageURL(symbol: Symbol): URL {
     return `https://stock.gapfocus.com/detail/${symbol}`
   }
 }

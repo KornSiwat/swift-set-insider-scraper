@@ -35,3 +35,44 @@ npm run-script build
 ```
 npm start
 ```
+
+## API
+
+- Scrape All Stock Prices
+
+  URL: /scrape-all-stock-prices
+
+  Method: POST
+
+  URL Params: None
+
+  Success:
+
+  - Status Code: 200
+  - Content: `started all stock price scrape`
+
+- Scrape All Stock Social Media News
+
+  URL: /scrape-all-stock-prices
+
+  Method: POST
+
+  URL Params: None
+
+  Success:
+
+  - Status Code: 200
+  - Content: `started all stock social media news scrape`
+
+- Scrape All Stock Official News
+
+  URL: /scrape-all-stock-official-news/
+
+  Method: POST
+
+  URL Params: None
+
+  Success:
+
+  - Status Code: 200
+  - Content: `started all stock official news scrape`

@@ -19,8 +19,8 @@ function createRouter(
   )
   
   router.post(
-    "/scrape-all-stock-news",
-    setInsiderScraperApplication.scrapeAllStockNews
+    "/scrape-all-stock-socialmedia-news",
+    setInsiderScraperApplication.scrapeAllStockSocialMediaNews
   )
 
   return router

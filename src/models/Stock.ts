@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from "typeorm"
 import { OfficialNews } from "./OfficialNews"
-import { News } from "./News"
+import { SocialMediaNews } from "./SocialMediaNews"
 import { Price } from "./Price"
 
 @Entity("stocks")
@@ -17,8 +17,8 @@ class Stock {
   @OneToMany(() => OfficialNews, (officialNews) => officialNews.stock)
   public officialNews: Price[]
 
-  @OneToMany(() => News, (news) => news.stock)
-  public news: Price[]
+  @OneToMany(() => SocialMediaNews, (socialMediaNews) => socialMediaNews.stock)
+  public socialMediaNews: Price[]
 
   constructor(symbol: string) {
     this.symbol = symbol

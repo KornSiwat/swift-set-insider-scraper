@@ -4,7 +4,7 @@ import { SETFacade } from "./facades/SETFacade"
 import { Price } from "./models/Price"
 import { Request, Response } from "express"
 import { OfficialNews } from "./models/OfficialNews"
-import { News } from "./models/News"
+import { SocialMediaNews } from "./models/SocialMediaNews"
 
 type Symbol = string
 
@@ -21,13 +21,15 @@ class SETInsiderScraperApplication {
     this.onGoingScrape = []
     this.scrapeAllStockPrices = this.scrapeAllStockPrices.bind(this)
     this.scrapeAllStockOfficialNews = this.scrapeAllStockOfficialNews.bind(this)
-    this.scrapeAllStockNews = this.scrapeAllStockNews.bind(this)
+    this.scrapeAllStockSocialMediaNews = this.scrapeAllStockSocialMediaNews.bind(
+      this
+    )
   }
 
-  public async scrapeAllStockNews(req: Request, res: Response) {
-    this.scrapeAllStock(this.scrapeStockNews, "News")
+  public async scrapeAllStockSocialMediaNews(req: Request, res: Response) {
+    this.scrapeAllStock(this.scrapeSocialMediaNews, "Social Media News")
 
-    res.status(200).send("started all stock news scrape")
+    res.status(200).send("started all stock social media news scrape")
   }
 
   public async scrapeAllStockOfficialNews(req: Request, res: Response) {
@@ -62,8 +64,8 @@ class SETInsiderScraperApplication {
     })
   }
 
-  private async scrapeStockNews(stock: Stock) {
-    const newsDataList = await this.setFacade.getNewsDataListByStockSymbol(
+  private async scrapeSocialMediaNews(stock: Stock) {
+    const newsDataList = await this.setFacade.getSocialMediaNewsDataListByStockSymbol(
       stock.symbol
     )
 
@@ -78,7 +80,7 @@ class SETInsiderScraperApplication {
       ))
 
       if (isStockNewsDataNotAlreadyExist) {
-        await this.syncNews(new News(stock, date, name, link))
+        await this.syncNews(new SocialMediaNews(stock, date, name, link))
       }
     })
   }
@@ -189,14 +191,20 @@ class SETInsiderScraperApplication {
     link: string,
     stock: Stock
   ): Promise<boolean> {
-    return await this.isDataWithGivenValueExist({ name, link, stock }, News)
+    return await this.isDataWithGivenValueExist(
+      { name, link, stock },
+      SocialMediaNews
+    )
   }
 
   private async isNewsWithGivenLinkAndStockExist(
     link: string,
     stock: Stock
   ): Promise<boolean> {
-    return await this.isDataWithGivenValueExist({ link, stock }, News)
+    return await this.isDataWithGivenValueExist(
+      { link, stock },
+      SocialMediaNews
+    )
   }
 
   private async isDataWithGivenValueExist<T>(
@@ -240,8 +248,8 @@ class SETInsiderScraperApplication {
     this.syncData(officialNews, OfficialNews)
   }
 
-  private async syncNews(news: News) {
-    this.syncData(news, News)
+  private async syncNews(socialMediaNews: SocialMediaNews) {
+    this.syncData(socialMediaNews, SocialMediaNews)
   }
 
   private async syncData<T>(data: any, entity: EntityTarget<T>) {

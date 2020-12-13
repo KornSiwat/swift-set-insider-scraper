@@ -4,12 +4,12 @@ import { ManyToOne } from "typeorm"
 import { Column } from "typeorm"
 import { Stock } from "./Stock"
 
-@Entity("news")
-class News {
+@Entity("socialmedia-news")
+class SocialMediaNews {
   @PrimaryGeneratedColumn("increment")
   readonly id: number
 
-  @ManyToOne(() => Stock, (stock) => stock.news)
+  @ManyToOne(() => Stock, (stock) => stock.socialMediaNews)
   readonly stock: Stock
 
   @Column({ type: "date" })
@@ -29,4 +29,4 @@ class News {
   }
 }
 
-export { News }
+export { SocialMediaNews }
