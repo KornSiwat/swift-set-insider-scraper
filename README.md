@@ -55,7 +55,7 @@ npm start
 
 - Scrape All Stock Social Media News
 
-  URL: /scrape-all-stock-prices
+  URL: /scrape-all-stock-socialmedia-news
 
   Method: POST
 
