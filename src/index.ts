@@ -35,7 +35,7 @@ async function main() {
   createConnection(await getOptions())
     .then((_) => {
       const app = express()
-      const port = 3000
+      const port = process.env.PORT || 3000
       const onGoingScrapeLimitCount = 5
 
       const setInsiderScraperApplication = new SETInsiderScraperApplication(
